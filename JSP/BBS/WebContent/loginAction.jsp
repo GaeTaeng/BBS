@@ -17,11 +17,6 @@
 	<%
 		UserDAO userDAO = new UserDAO();
 	int result = userDAO.login(user.getUserID(), user.getUserPassword());
-	if(true) {
-	PrintWriter script = response.getWriter();
-	script.println("alert('Now join')");
-	}
-	
 	if(result == 1) {
 		PrintWriter script = response.getWriter();
 		script.println("<script>");
