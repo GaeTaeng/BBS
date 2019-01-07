@@ -5,7 +5,150 @@
   <link rel="self" href="https://spring.io/blog.atom" />
   <id>http://spring.io/blog.atom</id>
   <icon>https://spring.io/favicon.ico</icon>
-  <updated>2019-01-03T00:00:00Z</updated>
+  <updated>2019-01-07T00:00:00Z</updated>
+  <entry>
+    <title>Bootiful Azure: SQL-based data access with Microsoft SQL Server  (2/6)</title>
+    <link rel="alternate" href="https://spring.io/blog/2019/01/07/bootiful-azure-sql-based-data-access-with-microsoft-sql-server-2-6" />
+    <category term="engineering" label="Engineering" />
+    <author>
+      <name>Josh Long</name>
+    </author>
+    <id>tag:spring.io,2019-01-02:3520</id>
+    <updated>2019-01-07T00:00:00Z</updated>
+    <content type="html">&lt;blockquote&gt;
+  &lt;p&gt;This is part 1 of a 6 part series, with new posts Mondays and Thursdays, introducing Microsoft Azure for Spring developers. I couldn&amp;rsquo;t have put this together without input from Microsoft&amp;rsquo;s Asir Vedamuthu Selvasingh, Yitao Dong, Bruno Borges, Brian Benz and Theresa Nguyen. You can find the code for this series &lt;a href="https://github.com/joshlong/bootiful-azure-article"&gt;on Github&lt;/a&gt;. Hit me up on &lt;a href="http://twitter.com/Starbuxman"&gt;Twitter (@starbuxman)&lt;/a&gt; as you&amp;rsquo;re reading the installments with any feedback or questions. You can also learn more about Microsoft Azure in my &lt;a href="http://twitter.com/SpringTipsLive"&gt;Spring Tips (@SpringTipsLive)&lt;/a&gt; installment, &lt;a href="https://spring.io/blog/2018/12/05/spring-tips-bootiful-microsoft-azure"&gt;&lt;em&gt;Bootiful Azure&lt;/em&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Catch up by reading the previous installments: &lt;/p&gt;
+&lt;ul&gt;
+  &lt;li&gt;&lt;a href="https://spring.io/blog/2019/01/03/bootiful-azure-taking-your-first-steps-with-microsoft-azure-1-6"&gt;Bootiful Azure: Taking Your First Steps with Microsoft Azure&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Let&amp;rsquo;s start with something short and sweet, the legendary Microsoft SQL Server. Microsoft SQL Server is an interesting beast. Sure, you can run it yourself, but wouldn&amp;rsquo;t you rather Microsoft, who build the product itself, do that for you? Now &lt;em&gt;that&lt;/em&gt; is a full-service solution! Imagine how nice that is? You don&amp;rsquo;t often see that sort of solution in other contexts. Imagine buying a car that you can drive as fast as you&amp;rsquo;d like, and on which the the manufacturer will guarantee any and all maintenance and repairs? Forever? Even if the car is hit with an asteroid? This is why running Microsoft SQL Server on Microsoft Azure is so appealing: the drudgery of the ownership is removed.&lt;/p&gt;
+&lt;p&gt;Don&amp;rsquo;t get me wrong. There&amp;rsquo;s plenty to recommend SQL Server in its own right. SQL Server has been around since 1989! It&amp;rsquo;s routinely ranked up there with the likes of Oracle DB and PostgreSQL as being among the most feature-filled database options out there. It&amp;rsquo;s been built over decades to serve enterprise use cases. It&amp;rsquo;s even got things that other databases, including the venerable PostgreSQL, sometimes lack, like Transparent Data Encryption wherein data is transparenly encrypted at rest.&lt;/p&gt;
+&lt;p&gt;SQL Server has its origins as an enterprise-grade database that ran on one operating system&amp;hellip;. OS/2! Wait, OS/2? Surely you meant Microsoft Windows? Nope! Microsoft joined Ashton-Tate and Sybase in the late 1980s to create a variant of Sybase SQL Server for IBM OS/2 (developed jointly with Microsoft at the time), which was released the following year.&lt;/p&gt;
+&lt;p&gt;This was the first version of Microsoft SQL Server, and served as Microsoft&amp;rsquo;s entry to the enterprise-level database market, competing against Oracle, IBM, and later, Sybase. SQL Server 6.0 was the first version designed for NT without direction from Sybase.&lt;/p&gt;
+&lt;p&gt;Windows NT was released in July 1993 and Sybase and Microsoft took differing directions. Each pursued its own design and marketing schemes. Microsoft negotiated exclusive rights to all versions of SQL Server written for Microsoft operating systems. Sybase and Microsoft SQL Server are two very different things today, with radically different codebases. Now, Microsoft maintain several editions of SQL Server for different usecases and workloads. It&amp;rsquo;s hard to qualify why Microsoft SQL Server is so amazing, so I&amp;rsquo;ll instead refer you to this &lt;a href="https://en.wikipedia.org/wiki/Comparison_of_relational_database_management_systems"&gt;pretty exhaustive Wikipedia page demonstrating&lt;/a&gt; different features acrosss various SQL database engines. Microsoft SQL Server fares pretty well!&lt;/p&gt;&lt;h2&gt;&lt;a href="#configuring-sql-server-on-microsoft-azure" class="anchor" name="configuring-sql-server-on-microsoft-azure"&gt;&lt;/a&gt;Configuring SQL Server on Microsoft Azure&lt;/h2&gt;
+&lt;p&gt;So, it was my hope to show you how to follow these instructions in the user interface in terms of screenshots but that seemed less than ideal because things in the Azure portal tend to be&amp;hellip; squirmy. Things move around. Also, these things are infinitely less scriptable. So, we&amp;rsquo;re going to use the &lt;code&gt;az&lt;/code&gt; CLI. Trouble is, it&amp;rsquo;s &amp;hellip; tedious. &lt;/p&gt;
+&lt;p&gt;Logically, what we want to do is trivial. We want to:&lt;/p&gt;
+&lt;ul&gt;
+  &lt;li&gt;create a SQL Server server instance&lt;/li&gt;
+  &lt;li&gt;create a SQL Server database in the server. Our Spring Boot application will preload this with a sample schema and data.&lt;/li&gt;
+  &lt;li&gt;expose the SQL Server instance to client accesses from our computer&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;We&amp;rsquo;re going to use a script to do this work:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="prettyprint shell"&gt;#!/bin/bash&#xD;
+&#xD;
+# Set an admin login and password for your database&#xD;
+export adminlogin=bootiful&#xD;
+export password=B00t1ful&#xD;
+&#xD;
+# The logical server name has to be unique in the system&#xD;
+export servername=${1}-server&#xD;
+&#xD;
+# The ip address range that you want to allow to access your DB&#xD;
+export startip=0.0.0.0&#xD;
+export endip=223.255.255.255&#xD;
+&#xD;
+# the name of the resource group&#xD;
+export rg=$1&#xD;
+&#xD;
+# Create a logical server in the resource group&#xD;
+az sql server create \&#xD;
+    --name $servername \&#xD;
+    --resource-group $rg \&#xD;
+    --admin-user $adminlogin \&#xD;
+    --admin-password $password&#xD;
+&#xD;
+# Configure a firewall rule for the server&#xD;
+az sql server firewall-rule create \&#xD;
+    --resource-group $rg \&#xD;
+    --server $servername \&#xD;
+    -n AllowYourIp \&#xD;
+    --start-ip-address $startip \&#xD;
+    --end-ip-address $endip&#xD;
+&#xD;
+# Create a database in the server with zone redundancy as true&#xD;
+az sql db create \&#xD;
+    --resource-group $rg \&#xD;
+    --server $servername \&#xD;
+    --name ${1}-sample-db \&#xD;
+    --service-objective Basic
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;This should dump out a &lt;em&gt;wall&lt;/em&gt; of JSON! Yikes! I culled this example from the Azure documentation and thank goodness, too! I don&amp;rsquo;t think I would want to have to arrive at this solution by myself. You&amp;rsquo;re going to want to note the &lt;code&gt;name&lt;/code&gt; attribute in the first JSON stanza printed to the console. We used the &lt;code&gt;$RANDOM&lt;/code&gt; variable to generate a, well, &lt;em&gt;random&lt;/em&gt; name, so it&amp;rsquo;ll be different on your machine. On my machine the value was &lt;code&gt;bootiful-22952&lt;/code&gt;. &lt;/p&gt;
+&lt;p&gt;Now, you&amp;rsquo;ve got a working server and a working database within the server. If you poke around the Azure Portal you&amp;rsquo;ll gleam all the connection information required to connect to the database. &lt;em&gt;Or&lt;/em&gt;, you could use this &lt;em&gt;one simple trick&lt;/em&gt;. &lt;/p&gt;
+&lt;pre&gt;&lt;code class="prettyprint shell"&gt;az sql db show-connection-string --client jdbc --name bootiful-sample-db
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;This command gives you client connection strings for a number of technologies, including the Windows ADO subsystem, Java&amp;rsquo;s JDBC driver interface, and PHP&amp;rsquo;s PDO interface. You&amp;rsquo;ll need to replace the &lt;code&gt;&amp;lt;server&amp;gt;&lt;/code&gt;, &lt;code&gt;&amp;lt;username&amp;gt;&lt;/code&gt; and &lt;code&gt;&amp;lt;password&amp;gt;&lt;/code&gt; section of the URI with the appropriate values, in this case &lt;code&gt;bootiful-server&lt;/code&gt;, &lt;code&gt;bootiful&lt;/code&gt; and &lt;code&gt;B00t1ful&lt;/code&gt; respectively. Alternatively, as we&amp;rsquo;ll see in a moment, you can define properties and use property placeholder resolution to parameterize this part of the connection string.&lt;/p&gt;&lt;h2&gt;&lt;a href="#introducing-sql-server-into-your-spring-application" class="anchor" name="introducing-sql-server-into-your-spring-application"&gt;&lt;/a&gt;Introducing SQL Server into your Spring Application&lt;/h2&gt;
+&lt;p&gt;Now that we&amp;rsquo;ve got a freshly confiugured SQL Server instrance up and running we need only use it like we would any other JDBC dependency in our codde. If you&amp;rsquo;re using the Spring Initialzir you can select &lt;code&gt;SQL Server&lt;/code&gt; and the appropriate dependency will be added to your Maven or Gradle build. Or, you can add it manually to your build using the following coordinates: &lt;code&gt;com.microsoft.sqlserver&lt;/code&gt; : &lt;code&gt;mssql-jdbc&lt;/code&gt;. You don&amp;rsquo;t need to specify the version; that&amp;rsquo;s done for you by Spring Boot itself. This particular dependency and itnegration with Microosft technologies doesn&amp;rsquo;t even require a particular Maven bill-of-materials dependency - it just works.&lt;/p&gt;
+&lt;p&gt;Then, you&amp;rsquo;ll need to specify the usual confiuguration properites so that Spring can instnantiate a connection to the &lt;code&gt;DataSource&lt;/code&gt; for you.&lt;/p&gt;
+&lt;pre&gt;&lt;code class="prettyprint properties;"&gt;&lt;br/&gt;sql-db=bootiful-sample-db&#xD;
+sql-username=bootiful&#xD;
+sql-password=B00t1ful&#xD;
+sql-servername=bootiful-server&#xD;
+&#xD;
+spring.datasource.url=jdbc:sqlserver://${sql-servername}.database.windows.net:1433;database=${sql-db};user=${sql-username}@${sql-servername};password=${sql-password};encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=30&#xD;
+spring.datasource.username=${sql-username}&#xD;
+spring.datasource.password=${sql-password}&#xD;
+&#xD;
+spring.datasource.initialization-mode=always&#xD;
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;I&amp;rsquo;ve encoded the username and password here, in the property file. This is a &lt;strong&gt;bad&lt;/strong&gt; idea. Generally, this is exactly the sort of thing you will want to live in an environment variable or in a configuration service like Spring Cloud Config Server. That setup out of the way, it&amp;rsquo;s trivial to use the resulting connection with any technology that supports both JDBC, generally, and Microsoft SQL Server, specifically.&lt;/p&gt;
+&lt;p&gt;Our application will consume data that needs to be installed in the database beforehand. Spring can help us out here. Spring Boot can automatically execute &lt;code&gt;src/main/resources/schema.sql&lt;/code&gt; and &lt;code&gt;src/main/resources/data.sql&lt;/code&gt; against the configured &lt;code&gt;DataSource&lt;/code&gt; if you specify &lt;code&gt;spring.datasource.initialization-mode=always&lt;/code&gt; in your properties. &lt;code&gt;schema.sql&lt;/code&gt; is an ideal place in which to put database DDL, and &lt;code&gt;data.sql&lt;/code&gt; is an ideal place in which to put sample data. &lt;/p&gt;
+&lt;p&gt;Our Spring blog software won&amp;rsquo;t let me capture SQL DDL in this post for, em, &lt;em&gt;security&lt;/em&gt; reasons? So, here is the &lt;a href="https://github.com/joshlong/bootiful-azure-article/blob/master/bootiful-azure/src/main/resources/schema.sql"&gt;&lt;code&gt;src/main/resources/schema.sql&lt;/code&gt;&lt;/a&gt; file on Github. Please consult that.&lt;/p&gt;
+&lt;p&gt;Here is our &lt;code&gt;src/main/resources/data.sql&lt;/code&gt;:&lt;/p&gt;
+&lt;pre&gt;&lt;code class="prettyprint sql"&gt;insert into customer(first_name, last_name)&#xD;
+values (&amp;#39;james&amp;#39;, &amp;#39;watters&amp;#39;),&#xD;
+       (&amp;#39;bob&amp;#39;, &amp;#39;lee&amp;#39;),&#xD;
+       (&amp;#39;trisha&amp;#39;, &amp;#39;gee&amp;#39;),&#xD;
+       (&amp;#39;mario&amp;#39;, &amp;#39;gray&amp;#39;),&#xD;
+       (&amp;#39;spencer&amp;#39;, &amp;#39;gibb&amp;#39;),&#xD;
+       (&amp;#39;yitao&amp;#39;, &amp;#39;dong&amp;#39;);
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Both will have been executed before our various event listeners. Let&amp;rsquo;s look at an event listener that pulls that data back out using a &lt;code&gt;JdbcTemplate&lt;/code&gt;. &lt;/p&gt;
+&lt;pre&gt;&lt;code class="prettyprint java"&gt;package com.example.bootifulazure;&#xD;
+&#xD;
+import lombok.AllArgsConstructor;&#xD;
+import lombok.Data;&#xD;
+import lombok.NoArgsConstructor;&#xD;
+import lombok.extern.log4j.Log4j2;&#xD;
+import org.springframework.boot.context.event.ApplicationReadyEvent;&#xD;
+import org.springframework.context.event.EventListener;&#xD;
+import org.springframework.jdbc.core.JdbcTemplate;&#xD;
+import org.springframework.jdbc.core.RowMapper;&#xD;
+import org.springframework.stereotype.Component;&#xD;
+&#xD;
+import java.util.List;&#xD;
+&#xD;
+@Component&#xD;
+@Log4j2&#xD;
+class SqlServerDemo {&#xD;
+&#xD;
+        private final JdbcTemplate jdbcTemplate;&#xD;
+&#xD;
+        SqlServerDemo(JdbcTemplate jdbcTemplate) {&#xD;
+                this.jdbcTemplate = jdbcTemplate;&#xD;
+        }&#xD;
+&#xD;
+        @EventListener(ApplicationReadyEvent.class)&#xD;
+        public void demo() {&#xD;
+                String query = &amp;quot; select TOP 3 * from customer &amp;quot;;&#xD;
+                RowMapper&amp;lt;Customer&amp;gt; rowMapper =&#xD;
+                    (rs, rowNum) -&amp;gt; new Customer(rs.getLong(&amp;quot;id&amp;quot;), rs.getString(&amp;quot;first_name&amp;quot;), rs.getString(&amp;quot;last_name&amp;quot;));&#xD;
+                List&amp;lt;Customer&amp;gt; customerList = this.jdbcTemplate.query(query, rowMapper);&#xD;
+                customerList.forEach(log::info);&#xD;
+        }&#xD;
+&#xD;
+        @Data&#xD;
+        @AllArgsConstructor&#xD;
+        @NoArgsConstructor&#xD;
+        private static class Customer {&#xD;
+                private Long id;&#xD;
+                private String firstName, lastName;&#xD;
+        }&#xD;
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;SQL Server is a compelling database for a number of use cases and the fact that Microsoft Azure makes scaling it so easy is a win for everyone. It&amp;rsquo;s worth mentioning that R2DBC, an effort at reactive SQL datastore access, already offers a Microsoft SQL Server implementation, in addition to H2 and PostgreSQL. You can even do reactive SQL Server access for even faster applications. All, seemingly, at the push of a button (or at least a tedious deployment script).&lt;/p&gt;</content>
+  </entry>
   <entry>
     <title>Bootiful Azure: Taking Your First Steps with Microsoft Azure (1/6)</title>
     <link rel="alternate" href="https://spring.io/blog/2019/01/03/bootiful-azure-taking-your-first-steps-with-microsoft-azure-1-6" />
@@ -1194,661 +1337,5 @@ Flux&amp;lt;Person&amp;gt; rows = databaseClient.select()&#xD;
   &lt;li&gt;Examples: &lt;a href="https://github.com/spring-projects/spring-data-examples/tree/master/r2dbc/example"&gt;github.com/spring-projects/spring-data-examples&lt;/a&gt;&lt;/li&gt;
   &lt;li&gt;&lt;a href="https://repo.spring.io/libs-milestone/org/springframework/data/spring-data-r2dbc/1.0.0.M1/"&gt;Artifacts&lt;/a&gt; - &lt;a href="https://docs.spring.io/spring-data/r2dbc/docs/1.0.0.M1/api"&gt;Javadoc&lt;/a&gt; - &lt;a href="https://docs.spring.io/spring-data/r2dbc/docs/1.0.0.M1/reference/html/"&gt;Documentation&lt;/a&gt; - &lt;a href="https://docs.spring.io/spring-data/r2dbc/docs/1.0.0.M1/changelog.txt"&gt;Changelog&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;</content>
-  </entry>
-  <entry>
-    <title>How Fast is Spring?</title>
-    <link rel="alternate" href="https://spring.io/blog/2018/12/12/how-fast-is-spring" />
-    <category term="engineering" label="Engineering" />
-    <author>
-      <name>Dave Syer</name>
-    </author>
-    <id>tag:spring.io,2018-12-12:3497</id>
-    <updated>2018-12-12T14:09:00Z</updated>
-    <content type="html">&lt;div class="paragraph"&gt;
-&lt;p&gt;Performance has always been one of the top priorities of the Spring Engineering team, and we are continually monitoring and responding to changes and to feedback. Some fairly intense and precise work has been done recently (in the last 2-3 years) and this article is here to help you to find the results of that work and to learn how to measure and improve performance in your own applications. The headline is that Spring Boot 2.1 and Spring 5.1 have some quite nice optimizations for startup time and heap usage. Here&amp;#8217;s a graph made by measuring startup time for heap constrained apps:&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="imageblock"&gt;
-&lt;div class="content"&gt;
-&lt;img src="https://docs.google.com/spreadsheets/d/e/2PACX-1vQpSEfx0Y1W9aD3XVyn91-S0jtUp2DRCQSy_W_LMGyMR91YLAQ1mL7MiR1BRd8VzshvtuxzL6WAnlxf/pubchart?oid=336485057&amp;format=image" alt="heap-size-2.1.x" width="75%"&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;As you squeeze the available heap, and application generally isn&amp;#8217;t affected on startup, until it reaches a critical point. The characteristic "hockey stick" shape of the graphs shows the point at which garbage collection loses the fight and the app no longer starts up at all. We see from the graphs that it is quite possible to run a simple Netty app in 10MB heap with Spring Boot 2.1 (but not with 2.0). It is also a bit faster in 2.1 compared to 2.0.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Most of the detail here refers specifically to measurements and optimizations for startup time, but heap memory consumption is also something that is very relevant because constraints on heap size can lead to slower startup (see the graph above). There are other aspects of performance that we could (and will) focus on, particularly where annotations are being used for HTTP request mapping, for example; but those concerns will have to wait for another, separate write up.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;When all things are considered, remember that Spring was designed &lt;em&gt;ab initio&lt;/em&gt; to be lightweight, and actually does very little work unless you ask it to. There are many &lt;strong&gt;optional&lt;/strong&gt; features, so you don&amp;#8217;t have to use them. Here are some quick summary points:&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="ulist"&gt;
-&lt;ul&gt;
-&lt;li&gt;
-&lt;p&gt;Packaging: an exploded jar with the application&amp;#8217;s own main is always faster&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Server: there is no measureable difference between Tomcat, Jetty and Undertow&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Netty is a &lt;em&gt;bit&lt;/em&gt; faster on startup - you won&amp;#8217;t notice in a large app&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;The more features you use, the more classes are loaded, and class loading is takes about 80% of startup time&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Functional bean definitions rule&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;If you can&amp;#8217;t use functional beans then manually choosing a set of Spring Boot autoconfigurations is usually faster than &lt;code&gt;@EnableAutoConfiguration&lt;/code&gt;&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;A minimal Spring Boot app with an HTTP endpoint starts in &amp;lt;1sec and uses &amp;lt;10MB heap&lt;/p&gt;
-&lt;/li&gt;
-&lt;/ul&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Some links:&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="ulist"&gt;
-&lt;ul&gt;
-&lt;li&gt;
-&lt;p&gt;&lt;a href="https://github.com/dsyer/spring-boot-startup-bench" class="bare"&gt;https://github.com/dsyer/spring-boot-startup-bench&lt;/a&gt; - older benchmarks (back to Spring Boot 1.3), fat jar data&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;&lt;a href="https://github.com/dsyer/spring-boot-startup-bench/blob/master/static/README.adoc"&gt;/static&lt;/a&gt; benchmarks in the same repo - newer, explores classes loaded correlation&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;&lt;a href="https://github.com/dsyer/spring-boot-startup-bench/blob/master/static/README.adoc"&gt;/flux&lt;/a&gt; benchmarks in the same repo - WebFlux&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;&lt;a href="https://spring.io/blog/2018/10/22/functional-bean-registrations-in-spring-cloud-function" class="bare"&gt;https://spring.io/blog/2018/10/22/functional-bean-registrations-in-spring-cloud-function&lt;/a&gt; - blog on functional beans in Spring Cloud Function&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Spring Fu: &lt;a href="https://github.com/spring-projects/spring-fu" class="bare"&gt;https://github.com/spring-projects/spring-fu&lt;/a&gt;&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;&lt;a href="https://github.com/dsyer/spring-boot-allocations" class="bare"&gt;https://github.com/dsyer/spring-boot-allocations&lt;/a&gt; - benchmarks for functional beans and GC pressure&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;&lt;a href="https://github.com/dsyer/spring-boot-micro-apps" class="bare"&gt;https://github.com/dsyer/spring-boot-micro-apps&lt;/a&gt; - functional beans and AOT (same code as the "allocations" project but sample apps not benchmarks)&lt;/p&gt;
-&lt;/li&gt;
-&lt;/ul&gt;
-&lt;/div&gt;
-&lt;div class="sect1"&gt;
-&lt;h2 id="tl-dr-how-do-i-make-my-app-go-faster"&gt;&lt;a class="anchor" href="#tl-dr-how-do-i-make-my-app-go-faster"&gt;&lt;/a&gt;TL;DR How do I make my app go faster?&lt;/h2&gt;
-&lt;div class="sectionbody"&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;(Copied from &lt;a href="https://github.com/dsyer/spring-boot-allocations"&gt;here&lt;/a&gt;.)  You are mostly going to have to drop features, so not all of these suggestions will be possible for all apps. Some are not so painful, and actually pretty natural in a container, e.g. if you are building a docker image it&amp;#8217;s better to unpack the jar and put application classes in a different filesystem layer anyway.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="ulist"&gt;
-&lt;ul&gt;
-&lt;li&gt;
-&lt;p&gt;Classpath exclusions from Spring Boot web starters:&lt;/p&gt;
-&lt;div class="ulist"&gt;
-&lt;ul&gt;
-&lt;li&gt;
-&lt;p&gt;Hibernate Validator&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Jackson (but Spring Boot actuators depend on it). Use
-Gson if you need JSON rendering (only works with MVC out of the box).&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Logback: use &lt;code&gt;slf4j-jdk14&lt;/code&gt; instead&lt;/p&gt;
-&lt;/li&gt;
-&lt;/ul&gt;
-&lt;/div&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Use the &lt;code&gt;spring-context-indexer&lt;/code&gt;. It&amp;#8217;s not going to add much, but every little helps.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Don&amp;#8217;t use actuators if you can afford not to.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Use Spring Boot 2.1 and Spring 5.1.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Fix the location of the
-&lt;a href="https://docs.spring.io/spring-boot/docs/current/reference/htmlsingle/#boot-features-external-config-application-property-files"&gt;Spring Boot config file(s)&lt;/a&gt;
-with &lt;code&gt;spring.config.location&lt;/code&gt; (command line argument or System property etc.).
-Example for testing in IDE:
-&lt;code&gt;spring.config.location=file://./src/main/resources/application.properties&lt;/code&gt;.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Switch off JMX if you don&amp;#8217;t need it with &lt;code&gt;spring.jmx.enabled=false&lt;/code&gt;&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Make bean definitions lazy by default. There&amp;#8217;s nothing in Spring
-Boot that does this generally, but you can set &lt;code&gt;spring.data.jpa.repositories.bootstrap-mode&lt;/code&gt;
-to defer the Spring Data initialization. There is also a &lt;code&gt;LazyInitBeanFactoryPostProcessor&lt;/code&gt;
-in &lt;a href="https://github.com/dsyer/spring-boot-allocations"&gt;this project&lt;/a&gt; you can copy.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Unpack the fat jar and run with an explicit classpath.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Run the JVM with &lt;code&gt;-noverify&lt;/code&gt;. Also consider &lt;code&gt;-XX:TieredStopAtLevel=1&lt;/code&gt;
-(that will slow down the JIT later at the expense of the saved startup time).&lt;/p&gt;
-&lt;/li&gt;
-&lt;/ul&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;A more extreme approach is to choose all the &lt;code&gt;@Configuration&lt;/code&gt; classes manually, instead of using &lt;code&gt;@EnableAutoConfiguration&lt;/code&gt;. This is fiddly and error prone, and you lose some of the benefits of autoconfiguration, but once done should be stable for any given codebase. The main benefit of this approach is really leaving out beans that you are not using. It is a fallacy to assume that autoconfiguration is slower because it "scans the classpath". The candidate autoconfiguration classes are selected very quickly without loading any of the classes, so this aspect is covered very efficiently and has been optimized extremely aggressively. But you might find that the default autoconfiguration settings choose things that you don&amp;#8217;t end up using.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;The most extreme choice is to re-write all your application configuration using functional bean definitions. This includes all the Spring Boot autoconfiguration you are using, most of which can be re-used, but it&amp;#8217;s stll manual work to identify which classes to use and register all the bean definitions. If you try this approach you might see a 2x improvement in startup time. Look at the &lt;code&gt;BuncApplication&lt;/code&gt; in the &lt;a href="https://github.com/dsyer/spring-boot-micro-apps"&gt;micro apps&lt;/a&gt; to see how to start Spring Boot without the &lt;code&gt;@Configuration&lt;/code&gt; class processor.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Excluding &lt;code&gt;netty-transport-native-epoll&lt;/code&gt; also boosts the startup time by 30ms or so (Linux only). This is a regression since Spring Boot 2.0, so once we understand it a bit better we can probably eliminate it.&lt;/p&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="sect1"&gt;
-&lt;h2 id="some-basic-benchmarks"&gt;&lt;a class="anchor" href="#some-basic-benchmarks"&gt;&lt;/a&gt;Some Basic Benchmarks&lt;/h2&gt;
-&lt;div class="sectionbody"&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Here is a subset of the &lt;a href="https://github.com/dsyer/spring-boot-startup-bench/blob/master/static/README.adoc"&gt;static benchmarks&lt;/a&gt; from &lt;a href="https://github.com/dsyer/spring-boot-startup-bench" class="bare"&gt;https://github.com/dsyer/spring-boot-startup-bench&lt;/a&gt;. Each app is started with a new JVM (separate process) per application startup, and has an explicit classpath (not fat jar). The app is always the same, but with different levels of automatic (and in some cases manual) configuration. The "Score" is startup time in seconds, measured as the time from starting the JVM to seeing a marker in the logger output (at this point the app is up and accepting HTTP connections).&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="listingblock"&gt;
-&lt;div class="content"&gt;
-&lt;pre class="prettyprint highlight"&gt;&lt;code&gt;Benchmark   (sample) Mode  Cnt  Score   Error  Units Beans Classes
-MainBenchmark  actr  avgt   10  1.316 ¡¾ 0.060   s/op 186   5666
-MainBenchmark  jdbc  avgt   10  1.237 ¡¾ 0.050   s/op 147   5625
-MainBenchmark  demo  avgt   10  1.056 ¡¾ 0.040   s/op 111   5266
-MainBenchmark  slim  avgt   10  1.003 ¡¾ 0.011   s/op 105   5208
-MainBenchmark  thin  avgt   10  0.855 ¡¾ 0.028   s/op 60    4892
-MainBenchmark  lite  avgt   10  0.694 ¡¾ 0.015   s/op 30    4580
-MainBenchmark  func  avgt   10  0.652 ¡¾ 0.017   s/op 25    4378&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="admonitionblock note"&gt;
-&lt;table&gt;
-&lt;tr&gt;
-&lt;td class="icon"&gt;
-&lt;div class="title"&gt;Note&lt;/div&gt;
-&lt;/td&gt;
-&lt;td class="content"&gt;
-The host machine is "tower", i7, 3.4GHz, 32G RAM, SSD.
-&lt;/td&gt;
-&lt;/tr&gt;
-&lt;/table&gt;
-&lt;/div&gt;
-&lt;div class="ulist"&gt;
-&lt;ul&gt;
-&lt;li&gt;
-&lt;p&gt;Actr: same as "demo" sample plus Actuator&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Jdbc: same as "demo" sample plus JDBC&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Demo: vanilla Spring Boot MVC app with one endpoint (no Actuator)&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Slim: same thing but explicitly &lt;code&gt;@Imports&lt;/code&gt; all configuration&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Thin: reduce the &lt;code&gt;@Imports&lt;/code&gt; down to a set of 4 that are needed for the endpoint&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Lite: copy the imports from "thin" and make them into hard-coded, unconditional configuration&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Func: extract the configuration methods from "lite" and register bits of it using the function bean API&lt;/p&gt;
-&lt;/li&gt;
-&lt;/ul&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Generally speaking, the more features are used, the more classes that are loaded, and also the more beans are created in the &lt;code&gt;ApplicationContext&lt;/code&gt;. The correlation is actually very tight between startup time and number of classes loaded (much tighter than versus number of beans). Here&amp;#8217;s a graph compiled from that data and extended with a range of other things, like JPA, bits of Spring Cloud, all the way up to the "kitchen sink" with everything on the classpath including Zuul and Sleuth:&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="imageblock"&gt;
-&lt;div class="content"&gt;
-&lt;img src="https://docs.google.com/spreadsheets/d/e/2PACX-1vR8B4l5WkWf-9gZWmIYTkmBWM7YWf5bRg852OakrV0G2-vtfM_UkVNRC3cTVk1079HagnMVHYZnvbib/pubchart?oid=976086548&amp;format=image" alt="pubchart?oid=976086548&amp;amp;format=image" width="75%"&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;The data for the graph can be scraped from the benchmark report if you run the "MainBenchmark" and the "StripBenchmark" in the static benchmarks (the table above is old data from a time when they were both in the same class). There are instructions about how to do that in the README.&lt;/p&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="sect1"&gt;
-&lt;h2 id="garbage-collection-pressure"&gt;&lt;a class="anchor" href="#garbage-collection-pressure"&gt;&lt;/a&gt;Garbage Collection Pressure&lt;/h2&gt;
-&lt;div class="sectionbody"&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;While it is true, and measureable, that more classes loaded (i.e. more features) is directly correlated with slower startup time, there are some subtleties, and one of the most important and also the slipperiest to analyse is garbage collection (GC). Garbage collection can be a really big deal for long running applications, and we have all heard stories of long GC pauses in large applications (the bigger your heap the longer you are likely to wait). Custom GC strategies are big business and an important tool for tweaking long-running, especially large applications. On startup there are some other things happening, but those can be related to garbage collection as well, and many of the optimizations in Spring 5.1 and Spring Boot 2.1 were obtained by analysing those.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;The main thing to look out for is tight loops with temporary objects being created and discarded. Some code in that pattern is unavoidable, and some is out of our control (e.g. it&amp;#8217;s in the JDK itself), and all we can do in that case is try not to call it. But these hordes of temporary objects create pressure on garbage collection and swell the heap, even if they never actually make it onto the heap per se. You can often see the effect of the extra GC pressure as a spike in heap size, if you can catch it happening. Flame graphs from &lt;a href="https://github.com/jvm-profiling-tools/async-profiler"&gt;async-profiler&lt;/a&gt; are a better tool because they are allow more fine-grained sampling than most profiling tools, and because they are visually very striking.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Here&amp;#8217;s an example flame graph from the HTTP sample app we have been benchmarking, with Spring Boot 2.0 and with Spring Boot 2.1:&lt;/p&gt;
-&lt;/div&gt;
-&lt;table class="tableblock frame-all grid-all spread"&gt;
-&lt;colgroup&gt;
-&lt;col style="width: 52%;"&gt;
-&lt;col style="width: 48%;"&gt;
-&lt;/colgroup&gt;
-&lt;tbody&gt;
-&lt;tr&gt;
-&lt;td class="tableblock halign-left valign-top"&gt;&lt;div&gt;&lt;div class="imageblock"&gt;
-&lt;div class="content"&gt;
-&lt;img src="https://github.com/dsyer/spring-boot-allocations/raw/master/images/flame_20.svg?sanitize=true" alt="flame_20"&gt;
-&lt;/div&gt;
-&lt;/div&gt;&lt;/div&gt;&lt;/td&gt;
-&lt;td class="tableblock halign-left valign-top"&gt;&lt;div&gt;&lt;div class="imageblock"&gt;
-&lt;div class="content"&gt;
-&lt;img src="https://github.com/dsyer/spring-boot-allocations/raw/master/images/flame_21.svg?sanitize=trueimages/flame_21.svg" alt="flame_21"&gt;
-&lt;/div&gt;
-&lt;/div&gt;&lt;/div&gt;&lt;/td&gt;
-&lt;/tr&gt;
-&lt;tr&gt;
-&lt;td class="tableblock halign-left valign-top"&gt;&lt;div&gt;&lt;div class="paragraph"&gt;
-&lt;p&gt;Spring Boot 2.0&lt;/p&gt;
-&lt;/div&gt;&lt;/div&gt;&lt;/td&gt;
-&lt;td class="tableblock halign-left valign-top"&gt;&lt;div&gt;&lt;div class="paragraph"&gt;
-&lt;p&gt;Spring Boot 2.1&lt;/p&gt;
-&lt;/div&gt;&lt;/div&gt;&lt;/td&gt;
-&lt;/tr&gt;
-&lt;/tbody&gt;
-&lt;/table&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;The red/brown GC flame on the right is noticeably smaller in Spring Boot 2.1. This is a
-sign of less GC pressure as a result of a &lt;a href="https://github.com/spring-projects/spring-framework/commit/81cb740e"&gt;change&lt;/a&gt; in the bean factory internals. The Spring Framework issue behind one of the main changes is &lt;a href="https://jira.spring.io/browse/SPR-16918"&gt;here&lt;/a&gt; if you want to look at the details.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Recognizing that GC pressure is an issue is one thing (and async-profiler is the best tool we have found), but locating its source is something of an art. The best tool we have found for that is Flight Recorder (or Java Mission Control) which is part of the OpenJDK release, although it used to be only in the Oracle distribution. The problem with Flight Recorder is that the sampling rate is not really high enough to capture enough data on startup, so you have to try and build tight loops that do something you are interested in, or suspect might be contributing to the problem, and analyse those over a longer period (a few seconds or more). This leads to additional insight, but no real data on whether a "real" application will benefit from changing the hotspot. Much of the code in the &lt;a href="https://github.com/dsyer/spring-boot-allocations"&gt;spring-boot-allocations&lt;/a&gt; project is this kind of code: main methods that run tight loops focusing on suspected hotspots that can then be analyzed with Flight Controller.&lt;/p&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="sect1"&gt;
-&lt;h2 id="webflux-and-micro-apps"&gt;&lt;a class="anchor" href="#webflux-and-micro-apps"&gt;&lt;/a&gt;WebFlux and Micro Apps&lt;/h2&gt;
-&lt;div class="sectionbody"&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;We might expect some variations between apps using a Servlet container and those using the newer reactive runtime from Netty introduced in Spring 5.0. The benchmark figures above are using Tomcat. There are some similar measurements in a different subdirectory of the same repo. Here are the results from the &lt;a href="https://github.com/dsyer/spring-boot-startup-bench/blob/master/flux/README.adoc"&gt;flux benchmarks&lt;/a&gt;:&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="listingblock"&gt;
-&lt;div class="content"&gt;
-&lt;pre class="prettyprint highlight"&gt;&lt;code&gt;Benchmark            (sample)  Mode  Cnt  Score   Error  Units Classes
-MainBenchmark.main       demo    ss   10  1.081 ¡¾ 0.075   s/op 5779
-MainBenchmark.main       jlog    ss   10  0.933 ¡¾ 0.065   s/op 4367
-MiniBenchmark.boot       demo    ss   10  0.579 ¡¾ 0.041   s/op 4138
-MiniBenchmark.boot       jlog    ss   10  0.486 ¡¾ 0.020   s/op 2974
-MiniBenchmark.mini       demo    ss   10  0.538 ¡¾ 0.009   s/op 3138
-MiniBenchmark.mini       jlog    ss   10  0.420 ¡¾ 0.011   s/op 2351
-MiniBenchmark.micro      demo    ss   10  0.288 ¡¾ 0.006   s/op 2112
-MiniBenchmark.micro      jlog    ss   10  0.186 ¡¾ 0.006   s/op 1371&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;All the apps have a single HTTP endpoint, just like the apps in the static benchmarks (Tomcat, Servlet). All are a bit faster than Tomcat, but not much (maybe 10%). Note that the fastest one ("micro jlog") is up and running in less than 200ms. Spring is really not doing very much there, and all the cost is basically getting the classes loaded for the features needed by the app (an HTTP server).&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Notes:&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="ulist"&gt;
-&lt;ul&gt;
-&lt;li&gt;
-&lt;p&gt;The &lt;code&gt;MainBenchmark.main(demo)&lt;/code&gt; is full Boot + Webflux + autoconfiguration.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;The &lt;code&gt;boot&lt;/code&gt; samples use Spring Boot but no autoconfiguration.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;The &lt;code&gt;jlog&lt;/code&gt; samples exclude logback as well as Hibernate Validator and Jackson.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;The &lt;code&gt;mini&lt;/code&gt; samples do not use Spring Boot (just &lt;code&gt;@EnableWebFlux&lt;/code&gt;).&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;The &lt;code&gt;micro&lt;/code&gt; samples do not use &lt;code&gt;@EnableWebflux&lt;/code&gt; either, just a manual route registration.&lt;/p&gt;
-&lt;/li&gt;
-&lt;/ul&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;The mini jlog sample runs in about 46MB memory (10 heap, 36 non-heap). The micro jlog sample runs in 38MB (8 heap, 30 non-heap). Non-heap is really what matters for these smaller apps. They are all included on the scatter plot above, so they are consistent with the general correlation between startup time and classes loaded.&lt;/p&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="sect1"&gt;
-&lt;h2 id="classpath-exclusions"&gt;&lt;a class="anchor" href="#classpath-exclusions"&gt;&lt;/a&gt;Classpath Exclusions&lt;/h2&gt;
-&lt;div class="sectionbody"&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Your mileage my vary, but consider excluding:&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="ulist"&gt;
-&lt;ul&gt;
-&lt;li&gt;
-&lt;p&gt;Jackson (&lt;code&gt;spring-boot-starter-json&lt;/code&gt;): it&amp;#8217;s not super expensive (maybe 50ms on startup), but Gson is faster, and also has a smaller footprint.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Logback (&lt;code&gt;spring-boot-starter-logging&lt;/code&gt;): still the best, most flexible logging library, but all that flexibility comes with a cost.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Hibernate Validator (&lt;code&gt;org.hibernate.validator:hibernate-validator&lt;/code&gt;): does a lot of work on startup, so if you are not using it, exclude it.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Actuators (&lt;code&gt;spring-boot-starter-actuator&lt;/code&gt;): a really useful feature set, so hard to recommend removing it completely, but if you aren&amp;#8217;t using it, don&amp;#8217;t put it on the classpath.&lt;/p&gt;
-&lt;/li&gt;
-&lt;/ul&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="sect1"&gt;
-&lt;h2 id="spring-tweaks"&gt;&lt;a class="anchor" href="#spring-tweaks"&gt;&lt;/a&gt;Spring Tweaks&lt;/h2&gt;
-&lt;div class="sectionbody"&gt;
-&lt;div class="ulist"&gt;
-&lt;ul&gt;
-&lt;li&gt;
-&lt;p&gt;Use the &lt;code&gt;spring-context-indexer&lt;/code&gt;. It&amp;#8217;s a drop in on the classpath, so very easy to install. It only works on your application&amp;#8217;s own &lt;code&gt;@Component&lt;/code&gt; classes, and really only likely to be a very small boost to startup time for all but the largest (1000s beans) applications. But it is measureable.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Don&amp;#8217;t use actuators if you can afford not to.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Use Spring Boot 2.1 and Spring 5.1. Both have small, but important optimizations, especially regarding garbage collection pressure on startup. This is what enables newer apps to start up with less heap.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Use explicit &lt;code&gt;spring.config.location&lt;/code&gt;. Spring Boot looks in quite a lot of locations for &lt;code&gt;application.properties&lt;/code&gt; (or &lt;code&gt;.yml&lt;/code&gt;), so if you know exactly where it is, or might be at runtime, you can shave off a few percent.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Switch off JMX: &lt;code&gt;spring.jmx.enabled=false&lt;/code&gt;. If you aren&amp;#8217;t using it you don&amp;#8217;t need to pay the cost of creating and registering the MBeans.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Make bean definitions lazy by default. There&amp;#8217;s nothing in Spring Boot that does this, but there&amp;#8217;s a &lt;code&gt;LazyInitBeanFactoryPostProcessor&lt;/code&gt; in &lt;a href="https://github.com/dsyer/spring-boot-allocations"&gt;this project&lt;/a&gt; you can copy. It is just a &lt;code&gt;BeanFactoryPostProcessor&lt;/code&gt; that switches all beans to &lt;code&gt;lazy=true&lt;/code&gt;.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Spring Data has some lazy initialization features now (in Lovelace, or Spring Boot 2.1). In Spring Boot you can just set &lt;code&gt;spring.data.jpa.repositories.bootstrap-mode=deferred&lt;/code&gt; (or &lt;code&gt;lazy&lt;/code&gt; for completely lazy) - for large apps with 100s of entities improves startup time by more than a factor of 10.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Use functional bean definitions instead of &lt;code&gt;@Configuration&lt;/code&gt;. More detail later on this.&lt;/p&gt;
-&lt;/li&gt;
-&lt;/ul&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="sect1"&gt;
-&lt;h2 id="jvm-tweaks"&gt;&lt;a class="anchor" href="#jvm-tweaks"&gt;&lt;/a&gt;JVM Tweaks&lt;/h2&gt;
-&lt;div class="sectionbody"&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Useful command line tweaks for startup time:&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="ulist"&gt;
-&lt;ul&gt;
-&lt;li&gt;
-&lt;p&gt;&lt;code&gt;-noverify&lt;/code&gt; - pretty much harmless, has a big impact. Might not be permitted in a low trust environment.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;&lt;code&gt;-XX:TieredStopAtLevel=1&lt;/code&gt; - potentially degrades performance later, after startup, since it restricts the JVM ability to optimize itself at runtime. Your mileage my vary but it will have a measureable impact on startup time.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;&lt;code&gt;-Djava.security.egd=file:/dev/./urandom&lt;/code&gt; - not really a thing any more, but older versions of Tomcat used to really need it. Might have a small effect on modern apps with or without Tomcat if anyone is using random numbers.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;&lt;code&gt;-XX:+AlwaysPreTouch&lt;/code&gt; - small but possibly measurable effect on startup.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Use an explicit classpath - i.e. explode the fat jar and use &lt;code&gt;java -cp &amp;#8230;&amp;#8203;&lt;/code&gt;. Use the application&amp;#8217;s native main class. More detail on this later.&lt;/p&gt;
-&lt;/li&gt;
-&lt;/ul&gt;
-&lt;/div&gt;
-&lt;div class="sect2"&gt;
-&lt;h3 id="class-data-sharing"&gt;&lt;a class="anchor" href="#class-data-sharing"&gt;&lt;/a&gt;Class Data Sharing&lt;/h3&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Class Data Sharing (CDS) was a commercial only feature of the Oracle JDK since version 7, but it has also available in &lt;a href="https://www.eclipse.org/openj9/"&gt;OpenJ9&lt;/a&gt; (the open source version of the IBM JVM) and now in OpenJDK since version 10. OpenJ9 has had CDS for a long time, and it is super easy to use in that platform. It was designed for optimizing memory usage, not startup time, but those two concerns are not unrelated.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;You can run OpenJ9 in the same way as a regular OpenJDK JVM, but the CDS is switched on with different command line flags. It&amp;#8217;s super convenient with OpenJ9 because all you need is &lt;code&gt;-Xshareclasses&lt;/code&gt;. It&amp;#8217;s probably also a good idea to increase the size of the cache, e.g. &lt;code&gt;-Xscmx128m&lt;/code&gt;, and to hint that you want a fast startup with &lt;code&gt;-Xquickstart&lt;/code&gt;. These flags are always on in the benchmarks if they detect the OpenJ9 or IBM JVM.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Benchmark results with OpenJ9 and CDS:&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="listingblock"&gt;
-&lt;div class="content"&gt;
-&lt;pre class="prettyprint highlight"&gt;&lt;code&gt;Benchmark            (sample)  Mode  Cnt  Score   Error  Units Classes
-MainBenchmark.main       demo    ss   10  0.939 ¡¾ 0.027   s/op 5954
-MainBenchmark.main       jlog    ss   10  0.709 ¡¾ 0.034   s/op 4536
-MiniBenchmark.boot       demo    ss   10  0.505 ¡¾ 0.035   s/op 4314
-MiniBenchmark.boot       jlog    ss   10  0.406 ¡¾ 0.085   s/op 3090
-MiniBenchmark.mini       demo    ss   10  0.432 ¡¾ 0.019   s/op 3256
-MiniBenchmark.mini       jlog    ss   10  0.340 ¡¾ 0.018   s/op 2427
-MiniBenchmark.micro      demo    ss   10  0.204 ¡¾ 0.019   s/op 2238
-MiniBenchmark.micro      jlog    ss   10  0.152 ¡¾ 0.045   s/op 1436&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;That is quite impressive in some cases (25% faster than without CDS for the fastest apps). Similar results can be achieved with OpenJDK: includes CDS (with a less convenient command line interface) since Java 10. Here&amp;#8217;s a scatter plot of the smaller end of the classes loaded versus startup time relationship, with regular OpenJDK (no CDS) in red and OpenJ9 (with CDS) in blue:&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="imageblock"&gt;
-&lt;div class="content"&gt;
-&lt;img src="https://docs.google.com/spreadsheets/d/e/2PACX-1vQpSEfx0Y1W9aD3XVyn91-S0jtUp2DRCQSy_W_LMGyMR91YLAQ1mL7MiR1BRd8VzshvtuxzL6WAnlxf/pubchart?oid=1689271723&amp;format=image" alt="pubchart?oid=1689271723&amp;amp;format=image" width="75%"&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Java 10 and 11 also have an experimental feature called Ahead of Time compilation (AOT) that lets you build a native image from a Java application. Potentially this is super fast on startup, and most apps that can successfully be converted are indeed very fast to start up (by a factor of 10 for the small apps in the benchmarks here). Many "real life" applications cannot yet be converted. AOT is implemented using  &lt;a href="https://github.com/oracle/graal"&gt;Graal VM&lt;/a&gt;, which we will come back to later.&lt;/p&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="sect1"&gt;
-&lt;h2 id="lazy-subsystems"&gt;&lt;a class="anchor" href="#lazy-subsystems"&gt;&lt;/a&gt;Lazy Subsystems&lt;/h2&gt;
-&lt;div class="sectionbody"&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;We mentioned lazy bean definitions and the idea of a &lt;code&gt;LazyInitBeanFactoryPostProcessor&lt;/code&gt; being generally of interest above. The benefits are clear, especially for a Spring Boot application with lots of autoconfigured beasn that you never uese, but also limited because even if you don&amp;#8217;t use them sometimes they needto be created to satisfy a dependency. Those limitations could possibly be addressed by another idea that is more of a research topic, and that is to break down application into modules and initialize each one separately on demand.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;To do this you would need to be able to precisely identify a subsystem in your source code and mark it somehow. An example of such a subsystem would be the actuators in Spring Boot, which we can identify mainly by the package names of the auto configuration classes. There is a prototype in this project: &lt;a href="https://github.com/dsyer/spring-boot-lazy-actuator"&gt;Lazy Actuator&lt;/a&gt;. You can just add it to an existing project and it converts all the actuator endpoints into lazy beans which will only be instantiated when they are used, saving about 40% of the startup time in a micro application like the canonical one-endpoint HTTP sample app in the benchmarks above. E.g. (for Maven):&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="listingblock"&gt;
-&lt;div class="title"&gt;pom.xml&lt;/div&gt;
-&lt;div class="content"&gt;
-&lt;pre class="prettyprint highlight"&gt;&lt;code class="language-xml" data-lang="xml"&gt;&amp;lt;dependency&amp;gt;
-	&amp;lt;groupId&amp;gt;org.springframework.boot.experimental&amp;lt;/groupId&amp;gt;
-	&amp;lt;artifactId&amp;gt;spring-boot-lazy-actuator&amp;lt;/artifactId&amp;gt;
-	&amp;lt;version&amp;gt;1.0.0.BUILD-SNAPSHOT&amp;lt;/version&amp;gt;
-&amp;lt;/dependency&amp;gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;To make this kind of pattern more mainstream would probably take some changes in the core Spring programming model, to allow the subsystems to be identified and dealt with in special ways at runtime. It also increases the complexity of an application, which might not really be worth it in a lot of cases - one of the best features of Spring Boot is the simplicity of the application context (all beans are created equal). So this remains an area of active research.&lt;/p&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="sect1"&gt;
-&lt;h2 id="manual-configuration"&gt;&lt;a class="anchor" href="#manual-configuration"&gt;&lt;/a&gt;Manual Configuration&lt;/h2&gt;
-&lt;div class="sectionbody"&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;As mentioned already, it can be beneficial, if a little fiddly, to manually select the &lt;code&gt;@Configuration&lt;/code&gt; classes instead of relying on &lt;code&gt;@EnableAutoConfiguration&lt;/code&gt;. For example, in a simple web application the most discardable autoconfigurations are&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="ulist"&gt;
-&lt;ul&gt;
-&lt;li&gt;
-&lt;p&gt;&lt;code&gt;TaskExecutionAutoConfiguration&lt;/code&gt; and &lt;code&gt;TaskSchedulingAutoConfiguration&lt;/code&gt; for background execution with &lt;code&gt;@Scheduled&lt;/code&gt; and &lt;code&gt;@Async&lt;/code&gt;.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;&lt;code&gt;JmxAutoConfiguration&lt;/code&gt; configures a lot of useful JMX instrumentation, but if you aren&amp;#8217;t going to use it, it&amp;#8217;s a waste.&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;&lt;code&gt;RestTemplateAutoConfiguration&lt;/code&gt; and &lt;code&gt;WebClientAutoConfiguration&lt;/code&gt;, both of which are on by default but you probably only use at most one of them.&lt;/p&gt;
-&lt;/li&gt;
-&lt;/ul&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Here&amp;#8217;s a minimal Spring Boot application with Netty and one endpoint, and selecting all configuration classes manually:&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="listingblock"&gt;
-&lt;div class="content"&gt;
-&lt;pre class="prettyprint highlight"&gt;&lt;code class="language-java" data-lang="java"&gt;@SpringBootConfiguration
-@Import({ PropertyPlaceholderAutoConfiguration.class,
-          ConfigurationPropertiesAutoConfiguration.class,
-		  ReactiveWebServerFactoryAutoConfiguration.class,
-          WebFluxAutoConfiguration.class,
-		  ErrorWebFluxAutoConfiguration.class,
-          HttpHandlerAutoConfiguration.class })
-public class SampleApplication {
-
-	@Bean
-	public RouterFunction&amp;lt;?&amp;gt; userEndpoints() {
-		return route(GET("/"), request -&amp;gt; ok().body(Mono.just("Hello"), String.class));
-	}
-
-	public static void main(String[] args) {
-		SpringApplication.run(SampleApplication.class, args);
-	}
-}&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;It will start in well under a second and in less than 10MB heap. The same app with &lt;code&gt;@SpringBootApplication&lt;/code&gt; (including all autoconfiguration) will start approximately 20% slower. Here are some benchmarks:&lt;/p&gt;
-&lt;/div&gt;
-&lt;table class="tableblock frame-all grid-all spread"&gt;
-&lt;colgroup&gt;
-&lt;col style="width: 25%;"&gt;
-&lt;col style="width: 25%;"&gt;
-&lt;col style="width: 25%;"&gt;
-&lt;col style="width: 25%;"&gt;
-&lt;/colgroup&gt;
-&lt;thead&gt;
-&lt;tr&gt;
-&lt;th class="tableblock halign-left valign-top"&gt;Style&lt;/th&gt;
-&lt;th class="tableblock halign-left valign-top"&gt;Beans&lt;/th&gt;
-&lt;th class="tableblock halign-left valign-top"&gt;Classes&lt;/th&gt;
-&lt;th class="tableblock halign-left valign-top"&gt;Startup(ms)&lt;/th&gt;
-&lt;/tr&gt;
-&lt;/thead&gt;
-&lt;tbody&gt;
-&lt;tr&gt;
-&lt;td class="tableblock halign-left valign-top"&gt;&lt;p class="tableblock"&gt;auto&lt;/p&gt;&lt;/td&gt;
-&lt;td class="tableblock halign-left valign-top"&gt;&lt;p class="tableblock"&gt;89&lt;/p&gt;&lt;/td&gt;
-&lt;td class="tableblock halign-left valign-top"&gt;&lt;p class="tableblock"&gt;4363&lt;/p&gt;&lt;/td&gt;
-&lt;td class="tableblock halign-left valign-top"&gt;&lt;p class="tableblock"&gt;850&lt;/p&gt;&lt;/td&gt;
-&lt;/tr&gt;
-&lt;tr&gt;
-&lt;td class="tableblock halign-left valign-top"&gt;&lt;p class="tableblock"&gt;lazy&lt;/p&gt;&lt;/td&gt;
-&lt;td class="tableblock halign-left valign-top"&gt;&lt;p class="tableblock"&gt;90&lt;/p&gt;&lt;/td&gt;
-&lt;td class="tableblock halign-left valign-top"&gt;&lt;p class="tableblock"&gt;4053&lt;/p&gt;&lt;/td&gt;
-&lt;td class="tableblock halign-left valign-top"&gt;&lt;p class="tableblock"&gt;777&lt;/p&gt;&lt;/td&gt;
-&lt;/tr&gt;
-&lt;tr&gt;
-&lt;td class="tableblock halign-left valign-top"&gt;&lt;p class="tableblock"&gt;manual&lt;/p&gt;&lt;/td&gt;
-&lt;td class="tableblock halign-left valign-top"&gt;&lt;p class="tableblock"&gt;51&lt;/p&gt;&lt;/td&gt;
-&lt;td class="tableblock halign-left valign-top"&gt;&lt;p class="tableblock"&gt;3788&lt;/p&gt;&lt;/td&gt;
-&lt;td class="tableblock halign-left valign-top"&gt;&lt;p class="tableblock"&gt;670&lt;/p&gt;&lt;/td&gt;
-&lt;/tr&gt;
-&lt;tr&gt;
-&lt;td class="tableblock halign-left valign-top"&gt;&lt;p class="tableblock"&gt;func&lt;/p&gt;&lt;/td&gt;
-&lt;td class="tableblock halign-left valign-top"&gt;&lt;p class="tableblock"&gt;48&lt;/p&gt;&lt;/td&gt;
-&lt;td class="tableblock halign-left valign-top"&gt;&lt;p class="tableblock"&gt;3647&lt;/p&gt;&lt;/td&gt;
-&lt;td class="tableblock halign-left valign-top"&gt;&lt;p class="tableblock"&gt;626&lt;/p&gt;&lt;/td&gt;
-&lt;/tr&gt;
-&lt;/tbody&gt;
-&lt;/table&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Key:&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="ulist"&gt;
-&lt;ul&gt;
-&lt;li&gt;
-&lt;p&gt;"auto": fully leaded &lt;code&gt;@SpringBootApplication&lt;/code&gt;&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;"lazy": all bean definitions are lazy by default&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;"manual": manually selected autoconfigurations&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;"func": the same but converted to functional bean definitions&lt;/p&gt;
-&lt;/li&gt;
-&lt;/ul&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="sect1"&gt;
-&lt;h2 id="functional-bean-definitions"&gt;&lt;a class="anchor" href="#functional-bean-definitions"&gt;&lt;/a&gt;Functional Bean Definitions&lt;/h2&gt;
-&lt;div class="sectionbody"&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Functional bean registration is a feature added to Spring 5.0, in the form of a few new methods in &lt;code&gt;BeanDefinitionBuilder&lt;/code&gt; and some convenience methods in &lt;code&gt;GenericApplicationContext&lt;/code&gt;. It allows for completely non-reflective creation of components by Spring, by attaching a &lt;code&gt;Supplier&lt;/code&gt; to a &lt;code&gt;BeanDefinition&lt;/code&gt;, instead of a &lt;code&gt;Class&lt;/code&gt;.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;The programming model is a little bit different than the most popular &lt;code&gt;@Configuration&lt;/code&gt; style, but it still has the same goal: to extract configuration logic into separate resources, and allow the logic to be implemented in Java. If you had a configuration class like this:&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="listingblock"&gt;
-&lt;div class="content"&gt;
-&lt;pre class="prettyprint highlight"&gt;&lt;code class="language-java" data-lang="java"&gt;@Configuration
-public class SampleConfiguration {
-
-    @Bean
-    public Foo foo() {
-        return new Foo();
-    }
-
-    @Bean
-    public Bar bar(Foo foo) {
-        return new Bar(foo);
-    }
-
-}&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;You could convert it to functional style like this:&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="listingblock"&gt;
-&lt;div class="content"&gt;
-&lt;pre class="prettyprint highlight"&gt;&lt;code class="language-java" data-lang="java"&gt;public class SampleConfiguration
-        implements ApplicationContextInitializer&amp;lt;GenericApplicationContext&amp;gt; {
-
-    public Foo foo() {
-        return new Foo();
-    }
-
-    public Bar bar(Foo foo) {
-        return new Bar(foo);
-    }
-
-    @Override
-    public void initialize(GenericApplicationContext context) {
-        context.registerBean(SampleConfiguration.class, () -&amp;gt; this);
-        context.registerBean(Foo.class,
-                () -&amp;gt; context.getBean(SampleConfiguration.class).foo());
-        context.registerBean(Bar.class, () -&amp;gt; context.getBean(SampleConfiguration.class)
-                .bar(context.getBean(Foo.class)));
-    }
-
-}&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;There are multiple options for where to make these &lt;code&gt;registerBean()&lt;/code&gt; method calls, but here we have chosen to show them wrapped in an &lt;code&gt;ApplicationContextInitializer&lt;/code&gt;. The &lt;code&gt;ApplicationContextInitializer&lt;/code&gt; is a core framework interface, but it has a special place in Spring Boot because a &lt;code&gt;SpringApplication&lt;/code&gt; can be loaded up with initializers through its public API, or by declaring them in &lt;code&gt;META-INF/spring.factories&lt;/code&gt;. The &lt;code&gt;spring.factories&lt;/code&gt; approach is one that easily allows the application and its integration tests (using &lt;code&gt;@SpringBootTest&lt;/code&gt;) to share the same configuration.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;This programming model is not yet mainstream in Spring Boot applications, but it has been implemented in &lt;a href="https://spring.io/blog/2018/10/22/functional-bean-registrations-in-spring-cloud-function"&gt;Spring Cloud Function&lt;/a&gt; and is also a basic building block in &lt;a href="https://spring.io/blog/2018/10/02/the-evolution-of-spring-fu"&gt;Spring Fu&lt;/a&gt;. Also the fastest full Spring Boot benchmark apps above ("bunc") are implemented this way. The main reason for this is that functional bean registration is the fastest way for Spring to create bean instances - it requires virtually no computation beyond instantiating a class and calling its constructors natively.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="admonitionblock note"&gt;
-&lt;table&gt;
-&lt;tr&gt;
-&lt;td class="icon"&gt;
-&lt;div class="title"&gt;Note&lt;/div&gt;
-&lt;/td&gt;
-&lt;td class="content"&gt;
-The other, non-functional types of &lt;code&gt;BeanDefinition&lt;/code&gt; will always be slower, but that will not stop us from optimizing further and the gap will almost certainly narrow as Spring evolves.
-&lt;/td&gt;
-&lt;/tr&gt;
-&lt;/table&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;The existing functional bean implementations in libraries and apps had to manually copy quite a bit of code from Spring Boot, and convert it to the functional style. For small applications this might be practical, but the more features from Spring Boot you use, the less convenient it will be. Recognizing this we have started work on various tools that could be used to automatically convert &lt;code&gt;@Configuration&lt;/code&gt; to &lt;code&gt;ApplicationContextInitializer&lt;/code&gt; code. You can do it at runtime with reflection, and this turns out to be &lt;a href="https://github.com/dsyer/spring-boot-auto-reflect"&gt;surprisingly fast&lt;/a&gt; (proving that not all reflection is bad), or you could do it at compile time, which promises to be optimal in turns of start up time but is technically a little bit harder to implement.&lt;/p&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="sect1"&gt;
-&lt;h2 id="the-future"&gt;&lt;a class="anchor" href="#the-future"&gt;&lt;/a&gt;The Future&lt;/h2&gt;
-&lt;div class="sectionbody"&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Whatever the future brings, I think we can be certain that Spring will stay as lightweight as possible, and continue to improve performance, in terms of startup time, memory usage and also runtime CPU usage. The most promising lines of attack at present are the functional bean registrations, and probably some automated way to generate those from &lt;code&gt;@Configuration&lt;/code&gt;, plus the work we are doing with the Graal team at Oracle to make GraalVM more generally usable for Spring Boot applications. There are still optimizations to be made in the core framework, as well as in Spring Boot probably. Keep an eye out on the &lt;a href="https://spring.io/blog"&gt;Spring Blog&lt;/a&gt; for more new research and new releases, and more topical analysis of performance hotspots and tweaks you can make to avoid them.&lt;/p&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;/div&gt;</content>
   </entry>
 </feed>
