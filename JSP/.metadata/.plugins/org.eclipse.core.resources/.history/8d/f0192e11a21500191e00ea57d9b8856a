@@ -137,34 +137,7 @@ public int getNext() {
 		}
 		
 
-		return false;  // 다음 페이지가 존재
-	}
-	
-	public Bbs getBbs(int bbsID) {
-
-		String SQL = "select * from bbs where bbsID = ?";
-		ArrayList<Bbs> list = new ArrayList<Bbs>();
-		try {
-			PreparedStatement pstmt = conn.prepareStatement(SQL);	
-			//bbsdao 같은 경우에는 여러 함수들을 사용하기때문에 각각의 함수끼리 db 접근에 있어서 마찰이 일어나지 ㅇ낳기 위해서 pstmt를 안에 넣어줌.
-			pstmt.setInt(1,  bbsID ); 
-			rs = pstmt.executeQuery(); 
-			if(rs.next()) {
-				Bbs bbs = new Bbs();
-				bbs.setBbsID(rs.getInt(1));
-				bbs.setBbsTitle(rs.getString(2));
-				bbs.setUserID(rs.getString(3));
-				bbs.setBbsDate(rs.getString(4));
-				bbs.setBbsContent(rs.getString(5));
-				bbs.setBbsAvailable(rs.getInt(6));
-				return bbs;
-			}
-		}catch(Exception e) {
-			e.printStackTrace();
-		}
-		
-
-		return null; // 게시글이 없는 경우. 
+		return false; 
 	}
 	
 }

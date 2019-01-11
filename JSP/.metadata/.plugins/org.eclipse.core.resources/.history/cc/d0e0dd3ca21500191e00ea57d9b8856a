@@ -137,7 +137,7 @@ public int getNext() {
 		}
 		
 
-		return false;  // 다음 페이지가 존재
+		return false; 
 	}
 	
 	public Bbs getBbs(int bbsID) {
