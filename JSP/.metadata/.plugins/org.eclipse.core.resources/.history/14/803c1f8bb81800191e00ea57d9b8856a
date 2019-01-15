@@ -27,6 +27,7 @@ public class BbsDAO {
 			
 			
 		}catch (Exception e) {
+			System.out.println("BbsDAO Constructor Error !! ");
 			e.printStackTrace();
 		}
 		///여기까지 실제로 MYSQL에 접속 하게 해 주는 부분///	

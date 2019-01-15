@@ -97,7 +97,7 @@
 					<tbody>
 						<tr>
 							<td style="width: 20%;">글 제목</td>
-							<td colspan="2"><%=bbs.getBbsTitle() %></td>
+							<td colspan="2"><%=bbs.getBbsTitle().replaceAll(" ", "&nbsp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\n", "<br>") %></td></td>
 						</tr>
 						
 						
@@ -106,8 +106,8 @@
 							<td colspan="2"><%=bbs.getUserID() %></td>
 						</tr>
 						<tr>
-							<td">작성일자</td>
-							<td colspan="2"><%=bbs.getBbsDate().substring(0, 11) + bbs.getBbsDate().substring(11, 13) + "시 " + bbs.getBbsDate().substring(14, 16) + "분 " %></td>
+							<td>작성일자</td>
+							<td colspan="2"><%=bbs.getBbsDate().substring(0, 11) + bbs.getBbsDate().substring(11, 13) + "시 " + bbs.getBbsDate().substring(14, 16) + "분 "%></td>
 						</tr>
 						
 						<tr>
